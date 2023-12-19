@@ -1,0 +1,77 @@
+pool:
+  vmImage: ubuntu-latest
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - modules
+
+resources:
+  repositories:
+    - repository: wiki
+      type: git
+      name: projectName/devopsWikiName.wiki
+
+variables:
+  containerRegistryName: ''
+  devOpsPatSecretName: ''
+  keyVaultName: ''
+  repositoryPrefix: ''
+  serviceConnection: ''
+  wikiRepo: "devopsWikiName.wiki"
+
+stages:
+  - stage: Release
+    displayName: "Release"
+    jobs:
+      - job: Deploy
+        displayName: "Deploy Modules"
+        steps:
+          - checkout: self
+            persistCredentials: true
+            fetchDepth: 0
+
+          - checkout: wiki
+            persistCredentials: true
+
+          - pwsh: |
+              $modules = Get-ChildItem -Path $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules
+              foreach ($module in $modules) {
+                  $moduleContent = Get-Content -Path $module.FullName -Raw
+
+                  if ($moduleContent -match 'metadata majorVersion' -and $moduleContent -match 'metadata minorVersion') {
+                      Write-Host "Metadata exists for $($module.BaseName)"
+                  }
+                  else {
+                      Write-Error "Metadata does not exist for $($module.BaseName). Add majorVersion and minorVersion metadata tags!"
+                  }
+              }
+            displayName: "Check if metadata tags exist for all modules"
+            continueOnError: false
+
+          - task: AzureCLI@2
+            displayName: "Upload modules to ACR"
+            inputs:
+              workingDirectory: $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)"
+              azureSubscription: ${{ variables.serviceConnection }}
+              scriptType: pscore
+              scriptLocation: scriptPath
+              scriptPath: "$(Build.Repository.Name)/pipelines/scripts/upload-modules-to-acr.ps1"
+              arguments: |
+                -containerRegistryName ${{ variables.containerRegistryName }} `
+                -modulePath "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules" `
+                -acrRepositoryPrefix ${{ variables.repositoryPrefix }}
+
+          - template: templates/template-add-documentation.yaml
+            parameters:
+              azureSubscription: ${{ variables.serviceConnection }}
+              keyVaultName: ${{ variables.keyVaultName }}
+              devOpsPatSecretName: ${{ variables.devOpsPatSecretName }}
+              markdownFolderPath: "$(System.DefaultWorkingDirectory)/documentation"
+              moduleVersions: $(ModuleVersions)
+              scriptFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/pipelines/scripts"
+              templateFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules"
+              wikiModuleFolder: "${{ variables.wikiRepo}}/Bicep-Modules"

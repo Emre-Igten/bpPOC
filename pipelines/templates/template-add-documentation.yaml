@@ -1,0 +1,81 @@
+parameters:
+  - name: azureSubscription
+    type: string
+  - name: keyVaultName
+    type: string
+  - name: devOpsPatSecretName
+    type: string
+  - name: markdownFolderPath
+    type: string
+  - name: scriptFolderPath
+    type: string
+  - name: templateFolderPath
+    type: string
+  - name: moduleVersions
+    type: string
+  - name: wikiModuleFolder
+    type: string
+
+steps:
+  - task: AzureKeyVault@2
+    displayName: "Get DevOps PAT from KeyVault"
+    inputs:
+      azureSubscription: ${{ parameters.azureSubscription }}
+      keyVaultName: ${{ parameters.keyVaultName }}
+      secretsFilter: ${{ parameters.devOpsPatSecretName }}
+
+  - task: PowerShell@2
+    displayName: "Generate documentation"
+    env:
+      AZURE_DEVOPS_EXT_PAT: $(${{ parameters.devOpsPatSecretName }})
+    inputs:
+      targetType: filePath
+      filePath: ${{ parameters.scriptFolderPath }}/create-md-documentation.ps1
+      arguments: -TemplateFolder "${{ parameters.templateFolderPath }}" -OutputFolder "${{ parameters.markdownFolderPath }}" -ModuleVersions '${{ parameters.moduleVersions }}'
+      pwsh: true
+      
+
+  - pwsh: |
+      if (!(Test-Path -Path "$(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}")) {
+        mkdir "$(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}" | Out-Null
+      }
+    displayName: "Git: Create WIKI folder"
+    workingDirectory: $(System.DefaultWorkingDirectory)
+
+  - pwsh: |
+      git config --global user.email "azuredevops@delaware.pro"
+      git config --global user.name "Azure DevOps"
+    displayName: "Git: Add Global Config"
+    workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}
+
+  - task: PowerShell@2
+    displayName: "Upload documentation"
+    inputs:
+      targetType: filePath
+      filePath: ${{ parameters.scriptFolderPath }}/upload-md-documentation.ps1
+      pwsh: true
+      arguments: |
+        -MarkdownFolder "${{ parameters.markdownFolderPath }}" `
+        -RootPath "$(System.DefaultWorkingDirectory)" `
+        -ModuleVersions '${{ parameters.moduleVersions }}' `
+        -WikiFolder ${{ parameters.wikiModuleFolder }}
+
+  - pwsh: |
+      git stash
+      git add *
+    displayName: "Git: Stage Changes"
+    workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}
+
+  - pwsh: |
+      git commit -a -m "Update module documentation"
+    displayName: "Git: Commit Changes"
+    workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}
+    continueOnError: 'true'
+    errorActionPreference: 'continue'
+
+
+  - pwsh: |
+      git branch --show-current
+      git push -f origin HEAD:wikiMaster
+    displayName: "Git: Push Changes"
+    workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.wikiModuleFolder }}
