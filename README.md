@@ -37,7 +37,8 @@ Versioning: `major.minor.patch` --> example: `1.0.0`
 - Azure DevOps project
 - Azure Container Registry
 - Azure Key Vault for storing the DevOps PAT (Personal Access Token)
-- Dedicated repository to place this flow in
+- Dedicated repository to place this flow in.
+- The **Project Collection Build Service** needs **Contribute** rights on the repository.
 
 #### Steps
 
