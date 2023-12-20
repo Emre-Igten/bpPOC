@@ -39,22 +39,21 @@ foreach ($file in $changedFiles) {
         Write-Host "Starting to upload module: $fileName"
 
         Write-Host "Get current latest version from ACR"
-        $repository = ""
-        if ($acrRepositoryPrefix -eq "") {
-            $repository = $fileName
+        if ($null -ne $(az acr repository show --name $containerRegistryName --repository "$acrRepositoryPrefix/$fileName")) {
+            $PublishedVersion = az acr repository show-tags --name "$($containerRegistryName)" --repository "$acrRepositoryPrefix/$fileName" --orderby time_asc --output json | ConvertFrom-Json
+            $currentLatestVersion = $PublishedVersion[-1]
+            $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
+            $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
+            $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
+            Write-Host "Current latest version on ACR: $acrMajorVersion.$acrMinorVersion.$acrIncrementVersion"
         }
         else {
-            $repository = "$acrRepositoryPrefix/$fileName"
+            $acrMajorVersion = 0
+            $acrMinorVersion = 0
+            $acrIncrementVersion = 0
+            Write-Host "No module found in ACR."
         }
         
-        $PublishedVersion = az acr repository show-tags --name "$($containerRegistryName)" --repository "$repository" --orderby time_asc --output json | ConvertFrom-Json
-        $currentLatestVersion = $PublishedVersion[-1]
-        $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
-        $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
-        $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
-
-        Write-Host "Current latest version on ACR: $acrMajorVersion.$acrMinorVersion.$acrIncrementVersion"
-
         Write-Host "Fetch majorversion and minorversion from bicep file"
         az bicep build --file $filePath
 
