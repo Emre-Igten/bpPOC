@@ -6,16 +6,11 @@ param (
 
     [Parameter(Mandatory = $true)]
     [String]
-    $modulePath,
-
-    [Parameter(Mandatory = $false)]
-    [String]
-    $acrRepositoryPrefix = ""
+    $modulePath
 )
 
 Write-Host "###################################################"
 Write-Host "Container Registry Name: $containerRegistryName"
-Write-Host "ACR Repository Prefix: $acrRepositoryPrefix"
 Write-Host "Module Path: $modulePath"
 Write-Host "###################################################"
 
@@ -37,10 +32,6 @@ foreach ($file in $changedFiles) {
         $filePath = $fileLocation.FullName
 
         $repository = $filePath.ToLower().Split('modules/')[-1].Replace('.bicep','')
-
-        if ($acrRepositoryPrefix -ne "") {
-            $repository = "$acrRepositoryPrefix/$repository"
-        }
 
         Write-Host "Folder: $folder"
         Write-Host "Filepath: $filePath"

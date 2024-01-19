@@ -13,15 +13,14 @@ resources:
   repositories:
     - repository: wiki
       type: git
-      name: projectName/devopsWikiName.wiki
+      name: project/projectName.wiki
 
 variables:
   containerRegistryName: ''
   devOpsPatSecretName: ''
   keyVaultName: ''
-  repositoryPrefix: ''
   serviceConnection: ''
-  wikiRepo: "devopsWikiName.wiki"
+  wikiRepo: ""
 
 stages:
   - stage: Release
@@ -64,15 +63,14 @@ stages:
           - task: AzureCLI@2
             displayName: "Upload modules to ACR"
             inputs:
-              workingDirectory: $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)"
+              workingDirectory: $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)
               azureSubscription: ${{ variables.serviceConnection }}
               scriptType: pscore
               scriptLocation: scriptPath
               scriptPath: "$(Build.Repository.Name)/pipelines/scripts/upload-modules-to-acr.ps1"
               arguments: |
                 -containerRegistryName ${{ variables.containerRegistryName }} `
-                -modulePath "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules" `
-                -acrRepositoryPrefix ${{ variables.repositoryPrefix }}
+                -modulePath "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules"
 
           - template: templates/template-add-documentation.yaml
             parameters:
@@ -84,3 +82,6 @@ stages:
               scriptFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/pipelines/scripts"
               templateFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules"
               wikiModuleFolder: "${{ variables.wikiRepo}}/Bicep-Modules"
+              devopsOrganizationUri: $(System.TeamFoundationCollectionUri)
+              devopsProjectName: $(System.TeamProject)
+              devopsRepoName: $(Build.Repository.Name)
