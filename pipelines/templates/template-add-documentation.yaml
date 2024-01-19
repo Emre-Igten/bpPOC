@@ -15,6 +15,12 @@ parameters:
     type: string
   - name: wikiModuleFolder
     type: string
+  - name: devopsOrganizationUri
+    type: string
+  - name: devopsProjectName
+    type: string
+  - name: devopsRepoName
+    type: string
 
 steps:
   - task: AzureKeyVault@2
@@ -31,7 +37,13 @@ steps:
     inputs:
       targetType: filePath
       filePath: ${{ parameters.scriptFolderPath }}/create-md-documentation.ps1
-      arguments: -TemplateFolder "${{ parameters.templateFolderPath }}" -OutputFolder "${{ parameters.markdownFolderPath }}" -ModuleVersions '${{ parameters.moduleVersions }}'
+      arguments: |
+        -TemplateFolder "${{ parameters.templateFolderPath }}" `
+        -OutputFolder "${{ parameters.markdownFolderPath }}" `
+        -ModuleVersions '${{ parameters.moduleVersions }}' `
+        -organizationUri ${{ parameters.devopsOrganizationUri }} `
+        -projectName ${{ parameters.devopsProjectName }} `
+        -repoName ${{ parameters.devopsRepoName }}
       pwsh: true
       
 

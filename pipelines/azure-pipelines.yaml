@@ -13,15 +13,14 @@ resources:
   repositories:
     - repository: wiki
       type: git
-      name: projectName/devopsWikiName.wiki
+      name: project/projectName.wiki
 
 variables:
   containerRegistryName: ''
   devOpsPatSecretName: ''
   keyVaultName: ''
-  repositoryPrefix: ''
   serviceConnection: ''
-  wikiRepo: "devopsWikiName.wiki"
+  wikiRepo: ""
 
 stages:
   - stage: Release
@@ -38,32 +37,40 @@ stages:
             persistCredentials: true
 
           - pwsh: |
-              $modules = Get-ChildItem -Path $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules
-              foreach ($module in $modules) {
-                  $moduleContent = Get-Content -Path $module.FullName -Raw
+              function CheckModuleMetadata($path) {
+                $items = Get-ChildItem -Path $path
 
-                  if ($moduleContent -match 'metadata majorVersion' -and $moduleContent -match 'metadata minorVersion') {
-                      Write-Host "Metadata exists for $($module.BaseName)"
+                foreach ($item in $items) {
+                  if ($item.PSIsContainer) {
+                    CheckModuleMetadata $item.FullName
                   }
                   else {
-                      Write-Error "Metadata does not exist for $($module.BaseName). Add majorVersion and minorVersion metadata tags!"
+                    $moduleContent = Get-Content -Path $item.FullName -Raw
+
+                    if ($moduleContent -match 'metadata majorVersion' -and $moduleContent -match 'metadata minorVersion') {
+                      Write-Host "Metadata exists for $($item.BaseName)"
+                    }
+                    else {
+                      Write-Error "Metadata does not exist for $($item.BaseName). Add majorVersion and minorVersion metadata tags!"
+                    }
                   }
+                }
               }
+              CheckModuleMetadata $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules
             displayName: "Check if metadata tags exist for all modules"
             continueOnError: false
 
           - task: AzureCLI@2
             displayName: "Upload modules to ACR"
             inputs:
-              workingDirectory: $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)"
+              workingDirectory: $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)
               azureSubscription: ${{ variables.serviceConnection }}
               scriptType: pscore
               scriptLocation: scriptPath
               scriptPath: "$(Build.Repository.Name)/pipelines/scripts/upload-modules-to-acr.ps1"
               arguments: |
                 -containerRegistryName ${{ variables.containerRegistryName }} `
-                -modulePath "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules" `
-                -acrRepositoryPrefix ${{ variables.repositoryPrefix }}
+                -modulePath "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules"
 
           - template: templates/template-add-documentation.yaml
             parameters:
@@ -75,3 +82,6 @@ stages:
               scriptFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/pipelines/scripts"
               templateFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules"
               wikiModuleFolder: "${{ variables.wikiRepo}}/Bicep-Modules"
+              devopsOrganizationUri: $(System.TeamFoundationCollectionUri)
+              devopsProjectName: $(System.TeamProject)
+              devopsRepoName: $(Build.Repository.Name)
