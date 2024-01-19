@@ -8,9 +8,9 @@ param (
     [String]
     $modulePath,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [String]
-    $acrRepositoryPrefix
+    $acrRepositoryPrefix = ""
 )
 
 Write-Host "###################################################"
@@ -33,24 +33,34 @@ foreach ($file in $changedFiles) {
     if ([IO.Path]::GetExtension($file) -eq '.bicep') {
         $fileLocation = (Get-ChildItem -Path $file)
         $folder = $fileLocation.DirectoryName.Split('\')[-1]
-        $fileName = $fileLocation.BaseName.ToLower()
+        $fileName = $fileLocation.BaseName
         $filePath = $fileLocation.FullName
 
-        Write-Host "Starting to upload module: $fileName"
+        $repository = $filePath.ToLower().Split('modules/')[-1].Replace('.bicep','')
+
+        if ($acrRepositoryPrefix -ne "") {
+            $repository = "$acrRepositoryPrefix/$repository"
+        }
+
+        Write-Host "Folder: $folder"
+        Write-Host "Filepath: $filePath"
+
+        Write-Host "Starting to upload module: $repository"
 
         Write-Host "Get current latest version from ACR"
-        if ($null -ne $(az acr repository show --name $containerRegistryName --repository "$acrRepositoryPrefix/$fileName")) {
-            $PublishedVersion = az acr repository show-tags --name "$($containerRegistryName)" --repository "$acrRepositoryPrefix/$fileName" --orderby time_asc --output json | ConvertFrom-Json
-            if ($PublishedVersion[-1] -eq "0") {
-                $acrMajorVersion = [int]$PublishedVersion.Split('.')[0]
-                $acrMinorVersion = [int]$PublishedVersion.Split('.')[1]
-                $acrIncrementVersion = [int]$PublishedVersion.Split('.')[-1]
-            } else {
+        if ($null -ne $(az acr repository show --name $containerRegistryName --repository "$repository")) {
+            $PublishedVersion = az acr repository show-tags --name "$($containerRegistryName)" --repository "$repository" --orderby time_asc --output json | ConvertFrom-Json
+
+            if($PublishedVersion.GetType().IsArray){
                 $currentLatestVersion = $PublishedVersion[-1]
-                $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
-                $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
-                $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
             }
+            else {
+                $currentLatestVersion = $PublishedVersion
+            }
+
+            $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
+            $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
+            $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
             
             Write-Host "Current latest version on ACR: $acrMajorVersion.$acrMinorVersion.$acrIncrementVersion"
         }
@@ -97,9 +107,9 @@ foreach ($file in $changedFiles) {
     
         Write-Host "Publish module with correct version to ACR"
         if ($versionNumber -ne "") {
-            az bicep publish --file $filePath --target br:$($containerRegistryName).azurecr.io/$($acrRepositoryPrefix)/$($fileName):$($versionNumber)
-            Write-Host "Module added on following location: $($containerRegistryName).azurecr.io/$($acrRepositoryPrefix)/$($fileName):$($versionNumber)"
-            $versions[$fileName] = $versionNumber
+            az bicep publish --file $filePath --target br:$($containerRegistryName).azurecr.io/$($repository):$($versionNumber)
+            Write-Host "Module added on following location: $($containerRegistryName).azurecr.io/$($repository):$($versionNumber)"
+            $versions[$fileName.ToLower()] = $versionNumber
         }
         else {
             Write-Error "No version number was found. Module will not be uploaded to ACR."

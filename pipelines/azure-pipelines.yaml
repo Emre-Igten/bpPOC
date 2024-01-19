@@ -38,17 +38,26 @@ stages:
             persistCredentials: true
 
           - pwsh: |
-              $modules = Get-ChildItem -Path $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules
-              foreach ($module in $modules) {
-                  $moduleContent = Get-Content -Path $module.FullName -Raw
+              function CheckModuleMetadata($path) {
+                $items = Get-ChildItem -Path $path
 
-                  if ($moduleContent -match 'metadata majorVersion' -and $moduleContent -match 'metadata minorVersion') {
-                      Write-Host "Metadata exists for $($module.BaseName)"
+                foreach ($item in $items) {
+                  if ($item.PSIsContainer) {
+                    CheckModuleMetadata $item.FullName
                   }
                   else {
-                      Write-Error "Metadata does not exist for $($module.BaseName). Add majorVersion and minorVersion metadata tags!"
+                    $moduleContent = Get-Content -Path $item.FullName -Raw
+
+                    if ($moduleContent -match 'metadata majorVersion' -and $moduleContent -match 'metadata minorVersion') {
+                      Write-Host "Metadata exists for $($item.BaseName)"
+                    }
+                    else {
+                      Write-Error "Metadata does not exist for $($item.BaseName). Add majorVersion and minorVersion metadata tags!"
+                    }
                   }
+                }
               }
+              CheckModuleMetadata $(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/modules
             displayName: "Check if metadata tags exist for all modules"
             continueOnError: false
 

@@ -6,9 +6,9 @@ Param (
     [Parameter(Mandatory = $true)][string]$ModuleVersions,
     [Parameter(Mandatory = $false)][bool]$KeepStructure = $True,
     [Parameter(Mandatory = $false)][bool]$IncludeWikiTOC = $false,
-    [Parameter(Mandatory = $false)][string]$organizationName = "fluvius",
-    [Parameter(Mandatory = $false)][string]$projectName = "xADP",
-    [Parameter(Mandatory = $false)][string]$repoName = "xADP-Template-Bouwblokken",
+    [Parameter(Mandatory = $true)][string]$organizationName,
+    [Parameter(Mandatory = $true)][string]$projectName,
+    [Parameter(Mandatory = $true)][string]$repoName,
     [Parameter(Mandatory = $false)][string]$targetBranch = "main"
 )
  
@@ -58,13 +58,21 @@ PROCESS {
                 $pattern = '(?<="description": ".*?)\\r\\n(?=(.*?"))'
                 $templateContent = $templateContent -replace $pattern, "<br />"
                 $templateObject = ConvertFrom-Json $templateContent -ErrorAction Stop
+
                 Write-Output $templateObject
-        
+                Write-Output "BaseName: $($armTemplate.BaseName)"  
+
                 if (!$templateObject) {
                     Write-Host ("Template file is not a valid json, please review the template")
                 }
                 else {
-                    $outputFile = ("$($OutputFolder)/$($armTemplate.BaseName)$($templateNameSuffix)")
+                    $outputFile = ("$($OutputFolder)$($armTemplate.FullName.Split($TemplateFolder)[-1].Replace('.json',''))$($templateNameSuffix)")
+                    
+                    if (!(Test-Path $outputFile)) {
+                        Write-Host ("Output path does not exist, creating the folder: $($outputFile.Replace("/$($armTemplate.BaseName)$templateNameSuffix",''))")
+                        New-Item -ItemType Directory -Force -Path $outputFile.Replace("/$($armTemplate.BaseName)$templateNameSuffix",'')
+                    }
+
                     Write-Host $outputFile
                     Out-File -FilePath $outputFile
                 }
