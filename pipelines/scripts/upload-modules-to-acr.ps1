@@ -8,9 +8,9 @@ param (
     [String]
     $modulePath,
 
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [String]
-    $acrRepositoryPrefix = ""
+    $acrRepositoryPrefix
 )
 
 Write-Host "###################################################"
@@ -41,10 +41,17 @@ foreach ($file in $changedFiles) {
         Write-Host "Get current latest version from ACR"
         if ($null -ne $(az acr repository show --name $containerRegistryName --repository "$acrRepositoryPrefix/$fileName")) {
             $PublishedVersion = az acr repository show-tags --name "$($containerRegistryName)" --repository "$acrRepositoryPrefix/$fileName" --orderby time_asc --output json | ConvertFrom-Json
-            $currentLatestVersion = $PublishedVersion[-1]
-            $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
-            $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
-            $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
+            if ($PublishedVersion[-1] -eq "0") {
+                $acrMajorVersion = [int]$PublishedVersion.Split('.')[0]
+                $acrMinorVersion = [int]$PublishedVersion.Split('.')[1]
+                $acrIncrementVersion = [int]$PublishedVersion.Split('.')[-1]
+            } else {
+                $currentLatestVersion = $PublishedVersion[-1]
+                $acrMajorVersion = [int]$currentLatestVersion.Split('.')[0]
+                $acrMinorVersion = [int]$currentLatestVersion.Split('.')[1]
+                $acrIncrementVersion = [int]$currentLatestVersion.Split('.')[-1]
+            }
+            
             Write-Host "Current latest version on ACR: $acrMajorVersion.$acrMinorVersion.$acrIncrementVersion"
         }
         else {
@@ -53,7 +60,7 @@ foreach ($file in $changedFiles) {
             $acrIncrementVersion = 0
             Write-Host "No module found in ACR."
         }
-        
+
         Write-Host "Fetch majorversion and minorversion from bicep file"
         az bicep build --file $filePath
 
@@ -90,8 +97,8 @@ foreach ($file in $changedFiles) {
     
         Write-Host "Publish module with correct version to ACR"
         if ($versionNumber -ne "") {
-            az bicep publish --file $filePath --target br:$($containerRegistryName).azurecr.io/$($repository):$($versionNumber)
-            Write-Host "Module added on following location: $($containerRegistryName).azurecr.io/$($repository):$($versionNumber)"
+            az bicep publish --file $filePath --target br:$($containerRegistryName).azurecr.io/$($acrRepositoryPrefix)/$($fileName):$($versionNumber)
+            Write-Host "Module added on following location: $($containerRegistryName).azurecr.io/$($acrRepositoryPrefix)/$($fileName):$($versionNumber)"
             $versions[$fileName] = $versionNumber
         }
         else {
