@@ -17,10 +17,8 @@ resources:
 
 variables:
   containerRegistryName: ''
-  devOpsPatSecretName: ''
-  keyVaultName: ''
   serviceConnection: ''
-  wikiRepo: ""
+  wikiRepo: ''
 
 stages:
   - stage: Release
@@ -74,9 +72,6 @@ stages:
 
           - template: templates/template-add-documentation.yaml
             parameters:
-              azureSubscription: ${{ variables.serviceConnection }}
-              keyVaultName: ${{ variables.keyVaultName }}
-              devOpsPatSecretName: ${{ variables.devOpsPatSecretName }}
               markdownFolderPath: "$(System.DefaultWorkingDirectory)/documentation"
               moduleVersions: $(ModuleVersions)
               scriptFolderPath: "$(System.DefaultWorkingDirectory)/$(Build.Repository.Name)/pipelines/scripts"
