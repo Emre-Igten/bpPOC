@@ -36,9 +36,9 @@ Versioning: `major.minor.patch` --> example: `1.0.0`
 
 - Azure DevOps project
 - Azure Container Registry
-- Azure Key Vault for storing the DevOps PAT (Personal Access Token)
 - Dedicated repository to place this flow in.
 - The **Project Collection Build Service** needs **Contribute** rights on the repository and the wiki.
+- The following must be **unchecked**: **Limit job authorization scope to current project for non-release pipelines** -> can be found under **Project Settings/Pipelines/settings**
 
 #### Steps
 
@@ -51,7 +51,7 @@ Versioning: `major.minor.patch` --> example: `1.0.0`
     metadata minorVersion = '0'
     ```
 
-4. provide the correct values in the pipeline
+4. Provide the correct values in the pipeline
 
     ```yaml
     resources:
@@ -62,8 +62,6 @@ Versioning: `major.minor.patch` --> example: `1.0.0`
 
     variables:
         containerRegistryName: ''   # Name of the Azure Container Registry
-        devOpsPatSecretName: ''     # Name of the secret in the Azure Key Vault
-        keyVaultName: ''            # Name of the Azure Key Vault
         serviceConnection: ''       # Name of the service connection to Azure
         wikiRepo: ''                # Name of the wiki repository
     ```
